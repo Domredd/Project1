@@ -5,8 +5,14 @@ Werkzeug Documentation:  https://werkzeug.palletsprojects.com/
 This file creates your application.
 """
 
-from app import app
-from flask import render_template, request, redirect, url_for
+from flask import flash, render_template, request, redirect, send_from_directory, url_for
+from unittest.mock import PropertyMock
+from app import app, db
+from app.forms import propertyForm
+from werkzeug.utils import secure_filename
+import os
+
+from app.models import properties_info
 
 
 ###
@@ -22,9 +28,40 @@ def home():
 @app.route('/about/')
 def about():
     """Render the website's about page."""
-    return render_template('about.html', name="Mary Jane")
+    return render_template('about.html', name="Dominique Reddicks")
 
+@app.route('/properties/create', methods=['POST','GET'])
+def property():
+    form = propertyForm()
+    if request.method == 'POST':
+        if form.validate_on_submit():
+            photo = form.photo.data
+            filename = secure_filename(photo.filename)
+            photo.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            title=form.title.data
+            description=form.description.data
+            bedroom=form.room.data
+            bathroom=form.bathroom.data
+            location=form.location.data
+            price=form.price.data
+            type=form.type.data
+            db.session.add(properties_info(title,bedroom,bathroom,location,price,description,type,filename))
+            db.session.commit()
+            flash('Property Added Successfully!', 'success')
+            return redirect(url_for('properties'))
+    else:
+        flash_errors(form)
+    return render_template('new_property.html',form=form)
 
+@app.route('/properties/<propertyid>')
+def this_property(propertyid):
+    property = properties_info.query.filter_by(id=propertyid).first()
+    return render_template('property.html',property=property)
+
+@app.route('/properties')
+def properties():
+    property = properties_info.query.all()
+    return render_template('properties.html',property=property)
 ###
 # The functions below should be applicable to all Flask apps.
 ###
